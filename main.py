@@ -5,7 +5,6 @@ from discord.ui import View, Button, Select
 import requests
 
 from libs.status import status_task as status_task
-import libs.giveaway as giveaway
 from libs.myvariables import Static
 import libs.database as mydb
 import libs.economy as economy
@@ -18,23 +17,19 @@ intents = discord.Intents.all()
 
 bot = discord.Bot(command_prefix="slash", intents=intents)
 
-giveaw = discord.SlashCommandGroup("giveaway", "giveaways")
 hibp = discord.SlashCommandGroup("breach", "check databreach data")
 econ = discord.SlashCommandGroup("eco", "bingbot economy")
 
 def static_response():
     vars = Static()
     return vars
-            
-def get_giveawayData(message):
-    return mydb.return_row_data("msgID", message)
 
 async def setup_economy(ctx):
     dbData = mydb.get_db_data("economy")
     conn = dbData[0]
     cursor = dbData[1]
 
-    cursor.execute("""INSERT INTO userdata VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (int(ctx.author.id), int(1000), "United Financial Inc.", int(0), int(0), int(time.time()), int(12), int(time.time()), int(20), int(20), int(time.time())))
+    cursor.execute("""INSERT INTO userdata VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", (int(ctx.author.id), int(1000), "United Financial Inc.", int(0), int(0), int(time.time()), int(12), int(time.time()), int(20), int(20), int(time.time())))
     conn.commit()
 
     cursor.close()
@@ -59,45 +54,14 @@ def add_spent(userID, amount):
 intents = discord.Intents.default()
 intents.members=True
 bot = discord.Bot(intents=intents)
-
-@tasks.loop(seconds=15)
-async def giveaway_loader():
-    data = mydb.return_table_data("giveaway")
-    
-    for i, v in enumerate(data):
-        dictData = giveaway.format_data("giveaway", v)
-        if v['end'] <= time.time() and v['completed'] == "False":
-
-            await giveaway.winner_format(bot=bot, userData=v)
-            return
         
 @bot.event
 async def on_ready():
-    if not giveaway_loader.is_running():
-        giveaway_loader.start()
-
     bot.loop.create_task(status_task(bot))
 
 @bot.event
 async def on_guild_join(guild):
     print("help")
-        
-@giveaw.command(description="Start a giveaway")
-async def start(ctx: discord.Interaction, length: Option(str, "Amount of Time", required=True, choices=["1 Minute", "5 Minutes", "10 Minutes", "30 Minutes", "1 Hour", "3 Hours", "12 Hours", "1 Day", "2 Days", "3 Days", "10 Days", "1 Week", "2 Weeks", "3 Weeks", "1 Month"])):
-    time = {"1 Minute": 60, "5 Minutes": 300, "10 Minutes": 600, "30 Minutes": 1800, "1 Hour": 3600, "3 Hours": 10800, "12 Hours": 43200, "1 Day": 86400,
-            "2 Days": 172800, "3 Days": 259200, "10 Days": 864000, "1 Week": 604800, "2 Weeks": 1209600, "3 Weeks": 1814400, "1 Month": 2629743}
-    await ctx.response.send_modal(giveaway.return_giveaway(bot, time[length]))
-
-@giveaw.command(description="Reroll a giveaway")
-async def reroll(ctx, winners: Option(int, "Amount to reroll", required=True), message_id: Option(str, "Message ID for the giveaway", required=True)):
-    data = mydb.return_row_data("msgID", message_id)
-    dictData = giveaway.format_data("giveaway", data)
-    
-    if dictData["completed"] == "True":
-      newWinners = giveaway.rerolling(guild=ctx.guild.id, winners=winners, dataInfo=dictData)
-      await ctx.respond(f"Congratulations {newWinners}! You won the **{dictData['prize']}**!")
-    else:
-        await ctx.respond(f"Invalid Message ID", ephemeral=True)
 
 @hibp.command(name="check", description="Check if company has been in a data breach")
 async def breach_check(ctx, company:Option(str, "Breached Company", required=True)):
@@ -237,6 +201,8 @@ async def profile(ctx, user:Option(discord.Member, "profile", required=True)):
     embed.add_field(name="〉 bingcoin", value=f"Wallet: `⌬{'*****' if ctx.author.id != data['userID'] else '{:,}'.format(data['wallet'])}`\nSpent: `⌬{data['spent']:,}`", inline=False)
     embed.add_field(name="〉 bank", value=f"Deposited: `⌬{data['balance']:,}`/`⌬{economy.bank_balance(data['bank']):,}`\nBank: `{data['bank']}`", inline=False)
     embed.add_field(name="〉 afk", value=f"Last Claim: <t:{int(data['lastAFK'])}:R>\nMax Claim Hours: `{data['maxAFK']}`", inline=False)
+    robTime = data['robTime']
+    embed.add_field(name="〉 robbery", value=f"Robbery Success Rate: `{data['robSuccess']}%`\nRobbery Winnings: `{data['stealPercent']}%`\nRobbery Cooldown `{f'{robTime}min' if robTime <= 60 else f'{robTime//60}h {robTime%60}min'}`\nLast Rob: <t:{int(data['lastRob'])}:R>", inline=False)
 
     embed.set_thumbnail(url=user.display_avatar)
     embed.set_footer(text="Powered by itsb1ng.dev", icon_url=static_response().logo)
@@ -258,7 +224,7 @@ async def deposit(ctx, amount:Option(int, "bingcoin to deposit", required=True))
     try:
         response = economy.depos(ctx.author.id, amount)
         if response['message'] == "success":
-            embed = discord.Embed(title=f"{ctx.author.name} deposited ⌬{amount:,}", description=f"Level {economy.current_level(response['spent'])}: {economy.bar_progress(response['spent'])}\n\n**Wallet:** `⌬{response['wallet']:,}`\n**Deposited:** `⌬{response['balance']:,}`/`⌬{economy.bank_balance(response['bank'])}`", color=static_response().defaultColor)
+            embed = discord.Embed(title=f"{ctx.author.name} deposited ⌬{amount:,}", description=f"Level {economy.current_level(response['spent'])}: {economy.bar_progress(response['spent'])}\n\n**Wallet:** `⌬{response['wallet']:,}`\n**Deposited:** `⌬{response['balance']:,}`/`⌬{economy.bank_balance(response['bank']):,}`", color=static_response().defaultColor)
             embed.set_thumbnail(url=ctx.author.display_avatar)
         elif response['message'] == "wait":
             embed = discord.Embed(title=f"Could Not Deposit", description=f"Please Wait: {response['time']}", color=0xC10000)
@@ -330,6 +296,7 @@ async def slot_machine(ctx, amount:Option(int, "bingcoin to wager", required=Tru
             slot_result = economy.generate_slot_result()
             await ctx.edit(content=economy.display_slot_result(slot_result))
             checkWin = economy.check_winner(slot_result, amount)
+            add_spent(ctx.author.id, amount)
             
             if checkWin[0]:
                 mydb.update_row_data("economy", "wallet", data['wallet']+checkWin[0], "userID", ctx.author.id)
@@ -345,7 +312,6 @@ async def slot_machine(ctx, amount:Option(int, "bingcoin to wager", required=Tru
             
             await ctx.send_followup(embed=embed)
 
-            add_spent(ctx.author.id, amount)
         else:  
             await ctx.respond(f"You do not have enough bingcoin to spin the slot machine. Check wallet balance")
     except:
@@ -378,7 +344,7 @@ async def econ_shop(ctx):
             return embed
         elif selection == "upgrades":
             data = mydb.format_data("economy", mydb.return_row_data("economy", "userID", interaction.user.id))
-            embed = discord.Embed(title=f"bingcoin shop - upgrades", description=f"+1 Claim Hour: `⌬{economy.next_hour_purchase(data['maxAFK']):,}`\n+5% Robbery Success Rate: `⌬{economy.next_rob_success_purchase(data['robSuccess']):,}`\n+5% Robbery Winnings Rate: `⌬{economy.next_rob_winnings_purchase(data['stealPercent']):,}`\n\n</eco purchase:1171600418887975033>", color=static_response().defaultColor)
+            embed = discord.Embed(title=f"bingcoin shop - upgrades", description=f"+1 Claim Hour: `⌬{economy.next_hour_purchase(data['maxAFK']):,}`\n+5% Robbery Success Rate: `⌬{economy.next_rob_success_purchase(data['robSuccess']):,}`\n+5% Robbery Winnings Rate: `⌬{economy.next_rob_winnings_purchase(data['stealPercent']):,}`\n-10min Robbery Cooldown: `⌬{economy.next_rob_cooldown_purchase(data['robTime']):,}`\n\n</eco purchase:1171600418887975033>", color=static_response().defaultColor)
             embed.set_thumbnail(url="https://i.imgur.com/vfTjbEG.png")
             return embed
 
@@ -398,7 +364,7 @@ async def econ_shop(ctx):
     select.callback = menu_callback
 
 @econ.command(name="purchase", description="purchase bincoin items")
-async def econ_purchase(ctx, bank:Option(str, "bingcoin banks", choices=["Omega Trust", "Azure Bank", "Apex Financial Corp.", "Obelisk Banks Inc.", "Zion Credit Union", "Aegis Banks Inc.", "Caliber Bancorp"])=None, upgrade:Option(str, "bingcoin upgrade", choices=['+1 Claim Hour', '+5% Robbery Success', '+5% Robbery Winnings'])=None):
+async def econ_purchase(ctx, bank:Option(str, "bingcoin banks", choices=["Omega Trust", "Azure Bank", "Apex Financial Corp.", "Obelisk Banks Inc.", "Zion Credit Union", "Aegis Banks Inc.", "Caliber Bancorp"])=None, upgrade:Option(str, "bingcoin upgrade", choices=['+1 Claim Hour', '+5% Robbery Success', '+5% Robbery Winnings', '-10min Robbery Cooldown'])=None):
     if upgrade or bank:
         try:
             data = mydb.format_data("economy", mydb.return_row_data("economy", "userID", ctx.author.id))
@@ -410,7 +376,7 @@ async def econ_purchase(ctx, bank:Option(str, "bingcoin banks", choices=["Omega 
                     if data['wallet'] >= bankPrice:
                         mydb.update_row_data("economy", "wallet", data['wallet']-bankPrice, "userID", ctx.author.id)
                         mydb.update_row_data("economy", "bank", bank, "userID", ctx.author.id)
-                        mydb.update_row_data("economy", "spent", bankPrice, "userID", ctx.author.id)
+                        add_spent(ctx.author.id, bankPrice)
                         newData = mydb.format_data("economy", mydb.return_row_data("economy", "userID", ctx.author.id))
                         embed = discord.Embed(title=f"Successfully purchased {bank} for `⌬{bankPrice:,}`", description=f"Level {economy.current_level(newData['spent'])}: {economy.bar_progress(newData['spent'])}\n\n**Wallet:** `⌬{newData['wallet']:,}`", color=static_response().defaultColor)
                         embed.set_thumbnail(url=ctx.author.display_avatar)
@@ -437,12 +403,18 @@ async def econ_purchase(ctx, bank:Option(str, "bingcoin banks", choices=["Omega 
                     whatAdded = "stealPercent"
                     name = "Robbery Winnings"
 
+                elif upgrade == '-10min Robbery Cooldown':
+                    upgradeCost = economy.next_rob_cooldown_purchase(data['robTime'])
+                    addition = 10
+                    whatAdded = "robTime"
+                    name = "Robbery Cooldown"
+
                 if data['wallet'] >= upgradeCost:
                     mydb.update_row_data("economy", "wallet", data['wallet']-upgradeCost, "userID", ctx.author.id)
                     mydb.update_row_data("economy", whatAdded, data[whatAdded]+addition, "userID", ctx.author.id)
                     mydb.update_row_data("economy", "spent", upgradeCost, "userID", ctx.author.id)
                     newData = mydb.format_data("economy", mydb.return_row_data("economy", "userID", ctx.author.id))
-                    embed = discord.Embed(title=f"Successfully added +{addition}{'%' if addition > 1 else ''} for `⌬{upgradeCost:,}`", description=f"Level {economy.current_level(newData['spent'])}: {economy.bar_progress(newData['spent'])}\n\n**Wallet:** `⌬{newData['wallet']:,}`\n{name}: `{newData[whatAdded]}{'%' if addition > 1 else ''}`", color=static_response().defaultColor)
+                    embed = discord.Embed(title=f"Successfully {'added' if addition < 10 else 'removed'} {'+' if addition < 10 else '-'}{addition}{'%' if addition == 5 else ('' if addition == 1 else 'min')} for `⌬{upgradeCost:,}`", description=f"Level {economy.current_level(newData['spent'])}: {economy.bar_progress(newData['spent'])}\n\n**Wallet:** `⌬{newData['wallet']:,}`\n{name}: `{newData[whatAdded]}{'%' if addition == 5 else ('' if addition == 1 else 'min')}`", color=static_response().defaultColor)
                     embed.set_thumbnail(url=ctx.author.display_avatar)
                     embed.set_footer(text=static_response().sponsor, icon_url=static_response().logo)
                 else:  
@@ -463,8 +435,8 @@ async def rob_user(ctx, user:Option(discord.Member, "user to rob bingcoin from",
         else:
             afkTime = time.time() - data['lastRob']
 
-            timeSince = afkTime / 3600
-            if timeSince >= 3:
+            timeSince = afkTime / 60
+            if timeSince >= data['robTime']:
                 if random.randint(1,100) <= data['robSuccess']:
                     winnings = int(victimData['stealPercent'] * victimData['wallet'])
                     mydb.update_row_data("economy", "wallet", data['wallet']-winnings, "userID", user.id)
@@ -476,7 +448,7 @@ async def rob_user(ctx, user:Option(discord.Member, "user to rob bingcoin from",
                 
                 mydb.update_row_data("economy", "lastRob", time.time(), "userID", ctx.author.id)
             else:
-                timeTil = f"<t:{int(data['lastRob']+10800)}:R>"
+                timeTil = f"<t:{int(data['lastRob']+(data['robTime']*60))}:R>"
                 embed = discord.Embed(title=f"Could Not Rob", description=f"Please Wait: {timeTil}", color=0xFCC03D)
 
             embed.set_footer(text=static_response().sponsor, icon_url=static_response().logo)
@@ -484,7 +456,98 @@ async def rob_user(ctx, user:Option(discord.Member, "user to rob bingcoin from",
     except:
         await setup_economy(ctx)
 
-bot.add_application_command(giveaw) 
+@bot.slash_command(name="invite", description="invite bingbot")
+async def invite_bingbot(ctx):
+    button = discord.ui.Button(label="invite bingbot", url="https://discord.com/api/oauth2/authorize?client_id=1168966805927243826&permissions=8&scope=bot%20applications.commands", style=discord.ButtonStyle.link)
+    view = View()
+    view.add_item(button)
+    embed = discord.Embed(title="bingbot", description="play with bingbot on your own server", color=static_response().defaultColor)
+    await ctx.respond(embed=embed, view=view)
+
+@econ.command(name="race", description="horse racing")
+async def horse_race(ctx, amount:Option(int, "Wager Amount", required=True)):
+    try:
+        data = mydb.format_data("economy", mydb.return_row_data("economy", "userID", ctx.author.id))
+        if data['wallet'] >= amount:
+
+            def get_position(dictionary):
+                return {color: info for color, info in dictionary.items() if info["position"] >= 41}
+
+            horseInfo = {"red": {"emoji": bot.get_emoji(1175098051212361929), "position": 1, "name": "Rosie Red"},
+                        "orange": {"emoji": bot.get_emoji(1175099206084595764), "position": 1, "name": "Ollie Orange"},
+                        "green": {"emoji": bot.get_emoji(1175098729523597393), "position": 1, "name": "Garry Green"},
+                        "blue": {"emoji": bot.get_emoji(1175098419417731132), "position": 1, "name": "Bonnie Blue"}
+                        }
+
+            async def race(interaction:discord.Interaction, choice:str):
+                mydb.update_row_data("economy", "wallet", data['wallet']-amount, "userID", ctx.author.id)
+                add_spent(ctx.author.id, amount)
+                horsePics = {"red": "https://i.imgur.com/D85wz19.png", "orange": "https://i.imgur.com/xwh6lP9.png", "green": "https://i.imgur.com/qBaOK7C.png", "blue": "https://i.imgur.com/ce9CKd4.png"}
+
+                msg = await interaction.response.send_message(f"You chose {choice}. Good luck!")
+                def dashes(number):
+                    return '―' * (number - 1 if number <= 41 else 40)
+                
+                def color(name):
+                    if name == "Rosie Red":
+                        return 'red'
+                    elif name == "Ollie Orange":
+                        return "orange"
+                    elif name == "Garry Green":
+                        return "green"
+                    else:
+                        return "blue"
+
+                def format_place(places, name):
+                    playerChoice = color(name)
+                    if places[0] == playerChoice:
+                        return ('won!', 3, 0x3DFC68)
+                    elif places[1] == playerChoice:
+                        return ('came in 2nd', 1.5, 0xF3FC3D)
+                    elif places[2] == playerChoice:
+                        return ('came in 3rd', 0.5, 0xF9A106)
+                    elif places[3] == playerChoice:
+                        return ('came in 4th', 0, 0xF90606)
+
+                numberRaces = 0
+                while len(get_position(horseInfo)) == 0:
+                    for i in range(0,4):
+
+                        numbertoAdd = random.randint(1,4)
+                        horseInfo[list(horseInfo.keys())[i]]['position'] += numbertoAdd
+
+                    numberRaces += 1
+                    await interaction.message.edit(f"{dashes(horseInfo['red']['position'])}{'🏁' if horseInfo['red']['position'] > 41 else ''}{horseInfo['red']['emoji']}{dashes(41-horseInfo['red']['position'])}{'🏁' if horseInfo['red']['position'] <= 40 else ''}\n{dashes(horseInfo['orange']['position'])}{'🏁' if horseInfo['orange']['position'] > 42 else ''}{horseInfo['orange']['emoji']}{dashes(41-horseInfo['orange']['position'])}{'🏁' if horseInfo['orange']['position'] <= 40 else ''}\n{dashes(horseInfo['green']['position'])}{'🏁' if horseInfo['green']['position'] > 42 else ''}{horseInfo['green']['emoji']}{dashes(41-horseInfo['green']['position'])}{'🏁' if horseInfo['green']['position'] <= 40 else ''}\n{dashes(horseInfo['blue']['position'])}{'🏁' if horseInfo['blue']['position'] > 42 else ''}{horseInfo['blue']['emoji']}{dashes(41-horseInfo['blue']['position'])}{'🏁' if horseInfo['blue']['position'] <= 40 else ''}")
+                    await asyncio.sleep(0.5)
+
+                winners = sorted(horseInfo, key=lambda x: horseInfo[x]["position"], reverse=True)
+                returnData = format_place(winners, choice)
+                amountWon = amount*returnData[1]
+                newData = mydb.format_data("economy", mydb.return_row_data("economy", "userID", ctx.author.id))
+                mydb.update_row_data("economy", "wallet", newData['wallet']+amountWon, "userID", ctx.author.id)
+                embed = discord.Embed(title=f"you {returnData[0]}", description=f"Level {economy.current_level(newData['spent'])}: {economy.bar_progress(newData['spent'])}\n\n**Winner:** `{horseInfo[winners[0]]['name']}`\n**Amount {'Won' if amountWon > amount else 'Lost'}**: `⌬{amountWon-amount if amountWon > amount else amount-amountWon:,.0f}`\n**Wallet:** `⌬{newData['wallet']+amountWon:,.0f}`", color=returnData[2])
+                embed.set_thumbnail(url=horsePics[color(choice)])
+                embed.set_footer(text=static_response().sponsor, icon_url=static_response().logo)
+                await msg.edit_original_response(content="", embed=embed)
+
+            async def menu_callback(interaction:discord.Interaction):
+                view = View()
+                await interaction.message.edit(content=f"{horseInfo['red']['emoji']}――――――――――――――――――――――――――――――――――――――――🏁\n{horseInfo['orange']['emoji']}――――――――――――――――――――――――――――――――――――――――🏁\n{horseInfo['green']['emoji']}――――――――――――――――――――――――――――――――――――――――🏁\n{horseInfo['blue']['emoji']}――――――――――――――――――――――――――――――――――――――――🏁", view=view)
+                await race(interaction, select.values[0])
+
+            select = Select(max_values=1, options=[discord.SelectOption(label="Rosie Red", emoji=horseInfo['red']['emoji'], description="Red Horse"), discord.SelectOption(label="Ollie Orange", emoji=horseInfo['orange']['emoji'], description="Orange Horse"), discord.SelectOption(label="Garry Green", emoji=horseInfo['green']['emoji'], description="Green Horse"), discord.SelectOption(label="Bonnie Blue", emoji=horseInfo['blue']['emoji'], description="Blue Horse")])
+            view = View(timeout=20)
+
+            view.add_item(select)
+            
+            await ctx.respond(view=view)
+
+            select.callback = menu_callback
+        else:  
+            await ctx.respond(f"You do not have enough bingcoin to wager on horse races. Check wallet balance")
+    except:
+        await setup_economy(ctx)
+
 bot.add_application_command(hibp)
 bot.add_application_command(econ)
 

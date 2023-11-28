@@ -69,4 +69,4 @@ def format_data(dbname, tuple):
     elif dbname == "servers":
         return dict({"guildID": tuple[0][0], "logs": tuple[0][1], "defaultRole": tuple[0][2]})
     else: 
-        return dict({"userID": tuple[0][0], "wallet": tuple[0][1], "bank": tuple[0][2], "balance": tuple[0][3], "spent": tuple[0][4], "depoTime": tuple[0][5], "maxAFK": tuple[0][6], "lastAFK": tuple[0][7], "robSuccess": tuple[0][8], "stealPercent": tuple[0][9], "lastRob": tuple[0][10]})
+        return dict({"userID": tuple[0][0], "wallet": tuple[0][1], "bank": tuple[0][2], "balance": tuple[0][3], "spent": tuple[0][4], "depoTime": tuple[0][5], "maxAFK": tuple[0][6], "lastAFK": tuple[0][7], "robSuccess": tuple[0][8], "stealPercent": tuple[0][9], "lastRob": tuple[0][10], "robTime": tuple[0][11]})

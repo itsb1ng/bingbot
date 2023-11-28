@@ -44,6 +44,9 @@ def next_rob_success_purchase(percent):
 def next_rob_winnings_purchase(percent):
     return int(9000 * (1.5*(0.25*((percent-20)//5))) ** ((percent-20)//5))
 
+def next_rob_cooldown_purchase(cooldown):
+    return int(6000 * (1.5*(0.2*((abs(cooldown-180))//10))) ** ((abs(cooldown-180))//10))
+
 def next_hour_purchase(time):
     return int(7500 * (1 + 1.64) ** (time-12))
 
